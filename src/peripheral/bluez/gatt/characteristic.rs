@@ -102,10 +102,7 @@ impl Characteristic {
                         receiver
                             .await
                             .map_err(|_| MethodErr::from((BLUEZ_ERROR_FAILED, "")))
-                            .and_then(|resp| match resp {
-                                gatt::event::Response::Success(value) => Ok((value,)),
-                                _ => Err(MethodErr::from((BLUEZ_ERROR_FAILED, ""))),
-                            })
+                            .and_then(response_into_dbus_method_result)
                     }
                     .map(move |result| ctx.reply(result))
                 },
@@ -142,10 +139,7 @@ impl Characteristic {
                         receiver
                             .await
                             .map_err(|_| MethodErr::from((BLUEZ_ERROR_FAILED, "")))
-                            .and_then(|resp| match resp {
-                                gatt::event::Response::Success(value) => Ok((value,)),
-                                _ => Err(MethodErr::from((BLUEZ_ERROR_FAILED, ""))),
-                            })
+                            .and_then(response_into_dbus_method_result)
                     }
                     .map(move |result| ctx.reply(result))
                 },
@@ -215,5 +209,19 @@ impl Characteristic {
         tree.insert(object_path.clone(), &[iface_token], object_path_data);
 
         Ok(Characteristic { object_path })
+    }
+}
+
+// Function used in read and write callbacks
+// This could be implemented as `From<Response> for Result<(Vec<u8>,), MethodErr>` but
+// that felt a little weird.
+fn response_into_dbus_method_result(response: gatt::event::Response) -> Result<(Vec<u8>,), MethodErr> {
+    match response {
+        gatt::event::Response::Success(value) => Ok((value,)),
+        gatt::event::Response::ApplicationError(inner) => {
+            log::debug!("Returning application-level error with code {:#04x}", inner.code());
+            Err(MethodErr::from((BLUEZ_ERROR_FAILED, inner.code().to_string())))
+        }
+        _ => Err(MethodErr::from((BLUEZ_ERROR_FAILED, "")))
     }
 }

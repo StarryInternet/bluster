@@ -33,6 +33,7 @@ pub struct NotifySubscribe {
 }
 
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub enum Response {
     Success(Vec<u8>),
     InvalidOffset,
